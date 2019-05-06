@@ -102,3 +102,4 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+input/10.2018_surface.nc

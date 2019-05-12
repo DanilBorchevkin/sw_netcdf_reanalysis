@@ -103,3 +103,10 @@ venv.bak/
 # mypy
 .mypy_cache/
 input/10.2018_surface.nc
+input/2006_12_vv.nc
+
+# NC files
+*.nc
+
+# vscode
+.vscode/

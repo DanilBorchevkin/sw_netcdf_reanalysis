@@ -3,7 +3,6 @@ import csv
 import glob
 import os
 
-
 def process_netcdf_file(fin, fout, **kwargs):
     print(">>> kwargs to process:")
     for key, value in kwargs.items():
@@ -22,12 +21,18 @@ def process_netcdf_file(fin, fout, **kwargs):
     print("<{}> contains from the following data_var:".format(fin))
     print(ds.data_vars)
 
-    # Check all neccessary dimension
+    # Check all neccessary dimensions
     if "latitude" not in ds.coords:
+        print("Available coods")
+        print(ds.coords)
         raise KeyError("Latitude dimension doesn't exists in Dataset coordinates. Please check your file {}".format(fin))
     if "longitude" not in ds.coords:
+        print("Available coods")
+        print(ds.coords)
         raise KeyError("Longitude dimension doesn't exists in Dataset coordinates. Please check your file{}".format(fin))
     if "time" not in ds.coords:
+        print("Available coods")
+        print(ds.coords)
         raise KeyError("Time dimension doesn't exists in Dataset coordinates. Please check your file {}".format(fin))
 
     # We should use coordinates from -180 to 180
@@ -37,19 +42,17 @@ def process_netcdf_file(fin, fout, **kwargs):
     shift_longitude = 0
     if start_longitude == 0.0:
         shift_longitude = -180.0
-        #kwargs['longitude'][0] = kwargs['longitude'][0] - shift_longitude
-        #kwargs['longitude'][1] = kwargs['longitude'][1] - shift_longitude
-        kwargs['longitude'][0] = kwargs['longitude'][0] - shift_longitude
+        kwargs['longitude'] = list(map(lambda coord: coord-shift_longitude, kwargs['longitude']))
 
     # Check all neccessary kwargs
     if "latitude" not in kwargs:
         raise KeyError("Latitude dimension doesn't exists in kwargs. Please check your args")
-    #if kwargs["latitude"] not in ds.coords["latitude"].data:
-    #    raise ValueError("Your latitude '{}' doesn't exist in dataset latitude dimenstion. Please check your args".format(kwargs["latitude"]))
+    if kwargs["latitude"] not in ds.coords["latitude"].data:
+        raise ValueError("Your latitude '{}' doesn't exist in dataset latitude dimenstion. Please check your args".format(kwargs["latitude"]))
     if "longitude" not in kwargs:
         raise KeyError("Longitude dimension doesn't exists in kwargs. Please check your args")
-    #if (kwargs["longitude"]) not in ds.coords["longitude"].data:
-    #    raise ValueError("Your longitude '{}' doesn't exist in dataset longitude dimenstion. Please check your args".format(kwargs["longitude"]))
+    if (kwargs["longitude"]) not in ds.coords["longitude"].data:
+        raise ValueError("Your longitude '{}' doesn't exist in dataset longitude dimenstion. Please check your args".format(kwargs["longitude"]))
     if "data" not in kwargs:
         raise KeyError("You didn't provide name of data_var. Please check your args - add <data> if it doesn't exist")
     if kwargs["data"] not in ds.data_vars:
@@ -61,20 +64,23 @@ def process_netcdf_file(fin, fout, **kwargs):
     if ("level" in ds.coords) and (kwargs["level"] not in ds.coords["level"].data):
         raise ValueError("Your level '{}' doesn't exist in dataset level dimenstion. Please check your args".format(kwargs["level"]))
  
-    # Select air data by time with constant lat, long and level if it exists
+    # Select data by time with constant lat, long and level if it exists and write it to corresponding file
     dsloc = None
-    if ("level" not in ds.coords):
-        dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], method='nearest')
-    else:
-        dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], level=kwargs["level"], method='nearest')
+
+
+    #if ("level" not in ds.coords):
+    #    dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], method='nearest')
+    #else:
+    #    dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], level=kwargs["level"], method='nearest')
 
     # Get data 
-    data_array = dsloc.to_array()
-    for val in data_array.values:
-        print(val.ravel())
+    #data_array = dsloc.to_array()
+    #for val in data_array.values:
+    #    print(val.ravel())
 
     # Save data to file 
-    data = dsloc['time']
+    # TODO don't forget shift longitude again
+    #data = dsloc['time']
 
 def get_out_file_name(file_path):
     result = ""
@@ -92,7 +98,6 @@ def get_out_file_name(file_path):
 
     return result
 
-
 def process_all_files_in_folder(in_folder, out_folder, **kwargs):
     for file_path in glob.glob(in_folder + "/" + "*.nc"):
         out_file_name = get_out_file_name(file_path)
@@ -102,16 +107,15 @@ def process_all_files_in_folder(in_folder, out_folder, **kwargs):
 
 def main():
     params = {
-        # latitude from 90.0 to -90.0
+        # latitude from 90.0 to -90.0 with step ???
         "latitude": [0], 
-        # longitude from -180.0 to 180.0          
+        # longitude from -180.0 to 180.0 with step ???         
         "longitude": [0],
         # level if exist for this type of the netCDF data. If not exist - please comment it
-        "level": 1,
+        "level": [1],
         # interested data - please provide name of variable
         "data": "w"
     }
-
     process_all_files_in_folder("./input", "./output", **params)
 
 if __name__ == "__main__":

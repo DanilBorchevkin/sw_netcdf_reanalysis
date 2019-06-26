@@ -5,11 +5,20 @@ import os
 
 CSV_DELIMETER = "    "
 CSV_EOL = "\n"
+CSV_FLOAT_FORMAT = '.10f'
 
 def process_netcdf_file(fin, fout, **kwargs):
     print(">>> kwargs to process:")
     for key, value in kwargs.items():
-        print("{0} = {1}".format(key, value))   
+        print("{0} = {1}".format(key, value)) 
+
+    # Check all neccessary kwargs
+    if "latitude" not in kwargs:
+        raise KeyError("Latitude dimension doesn't exists in kwargs. Please check your args")
+    if "longitude" not in kwargs:
+        raise KeyError("Longitude dimension doesn't exists in kwargs. Please check your args")
+    if "data" not in kwargs:
+        raise KeyError("You didn't provide name of data_var. Please check your args - add <data> if it doesn't exist")
 
     # Open netCDF file
     ds = xr.open_dataset(fin)
@@ -24,7 +33,7 @@ def process_netcdf_file(fin, fout, **kwargs):
     print("<{}> contains from the following data_var:".format(fin))
     print(ds.data_vars)
 
-    # Check all neccessary dimensions
+    # Check all neccessary dimensions inside netCDF file
     if "latitude" not in ds.coords:
         print("Available coods")
         print(ds.coords)
@@ -38,33 +47,31 @@ def process_netcdf_file(fin, fout, **kwargs):
         print(ds.coords)
         raise KeyError("Time dimension doesn't exists in Dataset coordinates. Please check your file {}".format(fin))
 
-    # We should use coordinates from -180 to 180
+    # Create dedicated variables for lats and longs
+    lats = kwargs["latitude"]
+    lons = kwargs["longitude"]
+
+    # We should use longitude coordinates from -180 to 180
     # But some netCDF files used 0 to 360.
     # So we just shift coordinates exaclty to -180 to 180
     start_longitude = ds.coords["longitude"].data[0]
     shift_longitude = 0
     if start_longitude == 0.0:
-        shift_longitude = -180.0
-        kwargs['longitude'] = list(map(lambda coord: coord-shift_longitude, kwargs['longitude']))
+        shift_longitude = 180.0
+        lons = list(map(lambda coord: coord+shift_longitude, lons))
 
-    # Check all neccessary kwargs
-    if "latitude" not in kwargs:
-        raise KeyError("Latitude dimension doesn't exists in kwargs. Please check your args")
-    if kwargs["latitude"] not in ds.coords["latitude"].data:
-        raise ValueError("Your latitude '{}' doesn't exist in dataset latitude dimenstion. Please check your args".format(kwargs["latitude"]))
-    if "longitude" not in kwargs:
-        raise KeyError("Longitude dimension doesn't exists in kwargs. Please check your args")
-    if (kwargs["longitude"]) not in ds.coords["longitude"].data:
-        raise ValueError("Your longitude '{}' doesn't exist in dataset longitude dimenstion. Please check your args".format(kwargs["longitude"]))
-    if "data" not in kwargs:
-        raise KeyError("You didn't provide name of data_var. Please check your args - add <data> if it doesn't exist")
+    # Check that own lats and lons exist inside netCDF file
+    if not set(lats).issubset(set(ds.coords["latitude"].data)):
+        raise ValueError("Your latitude '{}' doesn't exist in dataset latitude dimenstion. Please check your args".format(lats))
+    if not set(lons).issubset(set(ds.coords["longitude"].data)):
+        raise ValueError("Your longitude '{}' doesn't exist in dataset longitude dimenstion. Please check your args".format(lons))
     if kwargs["data"] not in ds.data_vars:
         raise KeyError("Interested data var <{}> doesn't exist in dataset. Please check your main() function or file".format(kwargs["data"]))
     
     # Check additional dimensions like 'level'
     if ("level" in ds.coords) and ("level" not in kwargs):
         raise KeyError("Target file has LEVEL coords but you didn't provide it. Please check your args")
-    if ("level" in ds.coords) and (kwargs["level"] not in ds.coords["level"].data):
+    if ("level" in ds.coords) and (not set(kwargs["level"]).issubset(ds.coords["level"].data)):
         raise ValueError("Your level '{}' doesn't exist in dataset level dimenstion. Please check your args".format(kwargs["level"]))
  
     # Select data by time with constant lat, long and level if it exists and write it to corresponding file
@@ -73,20 +80,20 @@ def process_netcdf_file(fin, fout, **kwargs):
 
 
     if ("level" not in ds.coords):
-        for lat in kwargs['latitude']:
-            for lon in kwargs["longitude"]:
+        for lat in lats:
+            for lon in lons:
                 dsloc = ds.sel(latitude=lat, longitude=lon)
                 time_list = dsloc.data['time']
-                data_list = dsloc.data[kwargs['data']]
-                resulting_list.append(pack_data_to_list(time_list, data_list, lat=lat, lon=lon+shift_longitude))
+                data_list = list(map(lambda val: format(val, CSV_FLOAT_FORMAT), dsloc[kwargs['data']].data))
+                resulting_list.append(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude))
     else:
-        for lat in kwargs['latitude']:
-            for lon in kwargs["longitude"]:
+        for lat in lats:
+            for lon in lons:
                 for lev in kwargs['level']:
                     dsloc = ds.sel(latitude=lat, longitude=lon, level=lev)
                     time_list = dsloc['time'].data
-                    data_list = dsloc[kwargs['data']].data
-                    resulting_list.extend(pack_data_to_list(time_list, data_list, lat=lat, lon=lon+shift_longitude, lev=lev))
+                    data_list = list(map(lambda val: format(val, CSV_FLOAT_FORMAT), dsloc[kwargs['data']].data))
+                    resulting_list.extend(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude, lev=lev))
 
     save_to_csv_file(fout, resulting_list)
 
@@ -145,12 +152,12 @@ def process_all_files_in_folder(in_folder, out_folder, **kwargs):
 
 def main():
     params = {
-        # latitude from 90.0 to -90.0 with step ???
+        # latitude from 90.0 to -90.0 with step 0.75
         "latitude": [0.0], 
-        # longitude from -180.0 to 180.0 with step ???         
-        "longitude": [0.0],
+        # longitude from -180.0 to 179.25 with step 0.75         
+        "longitude": [0.0, 0.75, 1.5],
         # level if exist for this type of the netCDF data. If not exist - please comment it
-        "level": [1],
+        "level": [1,2,100],
         # interested data - please provide name of variable
         "data": "w"
     }

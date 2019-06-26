@@ -78,7 +78,6 @@ def process_netcdf_file(fin, fout, **kwargs):
     dsloc = None
     resulting_list = list()
 
-
     if ("level" not in ds.coords):
         for lat in lats:
             for lon in lons:
@@ -136,7 +135,7 @@ def get_out_file_name(file_path, **kwargs):
     # Truncate extension
     result = result[: result.rfind(".")]
 
-    # Append data from kwargs
+    # Append data from kwargs if it needs
 
     # Append extenstion
     result += ".dat"

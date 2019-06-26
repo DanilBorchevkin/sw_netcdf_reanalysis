@@ -3,6 +3,9 @@ import csv
 import glob
 import os
 
+CSV_DELIMETER = "    "
+CSV_EOL = "\n"
+
 def process_netcdf_file(fin, fout, **kwargs):
     print(">>> kwargs to process:")
     for key, value in kwargs.items():
@@ -66,23 +69,58 @@ def process_netcdf_file(fin, fout, **kwargs):
  
     # Select data by time with constant lat, long and level if it exists and write it to corresponding file
     dsloc = None
+    resulting_list = list()
 
 
-    #if ("level" not in ds.coords):
-    #    dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], method='nearest')
-    #else:
-    #    dsloc = ds.sel(latitude=kwargs['latitude'], longitude=kwargs["longitude"], level=kwargs["level"], method='nearest')
+    if ("level" not in ds.coords):
+        for lat in kwargs['latitude']:
+            for lon in kwargs["longitude"]:
+                dsloc = ds.sel(latitude=lat, longitude=lon)
+                time_list = dsloc.data['time']
+                data_list = dsloc.data[kwargs['data']]
+                resulting_list.append(pack_data_to_list(time_list, data_list, lat=lat, lon=lon+shift_longitude))
+    else:
+        for lat in kwargs['latitude']:
+            for lon in kwargs["longitude"]:
+                for lev in kwargs['level']:
+                    dsloc = ds.sel(latitude=lat, longitude=lon, level=lev)
+                    time_list = dsloc['time'].data
+                    data_list = dsloc[kwargs['data']].data
+                    resulting_list.extend(pack_data_to_list(time_list, data_list, lat=lat, lon=lon+shift_longitude, lev=lev))
 
-    # Get data 
-    #data_array = dsloc.to_array()
-    #for val in data_array.values:
-    #    print(val.ravel())
+    save_to_csv_file(fout, resulting_list)
 
-    # Save data to file 
-    # TODO don't forget shift longitude again
-    #data = dsloc['time']
+def pack_data_to_list(*args, **kwargs):
+    out_list = list()
 
-def get_out_file_name(file_path):
+    if len(args) > 0:
+        list_len = len(args[0])
+        for i in range(list_len):
+            inner_list = list()
+            for arg in args:
+                inner_list.append(arg[i])
+            for _, value in kwargs.items():
+                inner_list.append(value)
+            out_list.append(inner_list)
+    
+    return out_list
+
+def save_to_csv_file(fout, data_list):
+    with open(fout, 'a') as file:
+        for line in data_list:
+            # When we use CSV we can't use delimeter with several chars
+            # So in this case we use "bare-metal" write
+            out_string = ''
+            for idx, val in enumerate(line):
+                if idx != 0:
+                    out_string += CSV_DELIMETER
+                out_string += str(val)
+
+            out_string += CSV_EOL
+
+            file.write(out_string)
+
+def get_out_file_name(file_path, **kwargs):
     result = ""
 
     # Get only file name
@@ -108,9 +146,9 @@ def process_all_files_in_folder(in_folder, out_folder, **kwargs):
 def main():
     params = {
         # latitude from 90.0 to -90.0 with step ???
-        "latitude": [0], 
+        "latitude": [0.0], 
         # longitude from -180.0 to 180.0 with step ???         
-        "longitude": [0],
+        "longitude": [0.0],
         # level if exist for this type of the netCDF data. If not exist - please comment it
         "level": [1],
         # interested data - please provide name of variable

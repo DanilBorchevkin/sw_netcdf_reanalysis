@@ -158,20 +158,6 @@ def save_all_to_csv_files_by_date(fout, data_list):
 
                 file.write(out_string)
 
-    with open(fout, 'a') as file:
-        for line in data_list:
-            # When we use CSV we can't use delimeter with several chars
-            # So in this case we use "bare-metal" write
-            out_string = ''
-            for idx, val in enumerate(line):
-                if idx != 0:
-                    out_string += CSV_DELIMETER
-                out_string += str(val)
-
-            out_string += CSV_EOL
-
-            file.write(out_string)
-
 def get_out_file_name(file_path, **kwargs):
     result = ""
 
@@ -181,7 +167,9 @@ def get_out_file_name(file_path, **kwargs):
     # Truncate extension
     result = result[: result.rfind(".")]
 
-    # Append data from kwargs if it needs
+    # Append data from kwargs
+    result += '_' + kwargs['data']
+    result += '_' + str(kwargs['level'][0])
 
     # Append extenstion
     result += ".dat"
@@ -190,7 +178,7 @@ def get_out_file_name(file_path, **kwargs):
 
 def process_all_files_in_folder(in_folder, out_folder, **kwargs):
     for file_path in glob.glob(in_folder + "/" + "*.nc"):
-        out_file_name = get_out_file_name(file_path)
+        out_file_name = get_out_file_name(file_path, **kwargs)
         print(" >>> Process file '{}' with output name '{}'".format(file_path, out_file_name))
         process_netcdf_file(file_path, out_folder + "/" + out_file_name, **kwargs)
         print("")

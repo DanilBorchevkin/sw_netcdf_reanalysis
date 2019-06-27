@@ -1,4 +1,5 @@
 import xarray as xr
+from collections import defaultdict
 import csv
 import glob
 import os
@@ -82,7 +83,7 @@ def process_netcdf_file(fin, fout, **kwargs):
         for lat in lats:
             for lon in lons:
                 dsloc = ds.sel(latitude=lat, longitude=lon)
-                time_list = dsloc.data['time']
+                time_list = list(map(lambda val: str(val), dsloc['time'].data))
                 data_list = list(map(lambda val: format(val, CSV_FLOAT_FORMAT), dsloc[kwargs['data']].data))
                 resulting_list.append(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude))
     else:
@@ -90,11 +91,11 @@ def process_netcdf_file(fin, fout, **kwargs):
             for lon in lons:
                 for lev in kwargs['level']:
                     dsloc = ds.sel(latitude=lat, longitude=lon, level=lev)
-                    time_list = dsloc['time'].data
+                    time_list = list(map(lambda val: str(val), dsloc['time'].data))
                     data_list = list(map(lambda val: format(val, CSV_FLOAT_FORMAT), dsloc[kwargs['data']].data))
                     resulting_list.extend(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude, lev=lev))
 
-    save_to_csv_file(fout, resulting_list)
+    save_all_to_csv_files_by_date(fout, resulting_list)
 
 def pack_data_to_list(*args, **kwargs):
     out_list = list()
@@ -111,7 +112,52 @@ def pack_data_to_list(*args, **kwargs):
     
     return out_list
 
-def save_to_csv_file(fout, data_list):
+def save_all_to_csv_file(fout, data_list):
+    with open(fout, 'a') as file:
+        for line in data_list:
+            # When we use CSV we can't use delimeter with several chars
+            # So in this case we use "bare-metal" write
+            out_string = ''
+            for idx, val in enumerate(line):
+                if idx != 0:
+                    out_string += CSV_DELIMETER
+                out_string += str(val)
+
+            out_string += CSV_EOL
+
+            file.write(out_string)
+
+def separate_data_by_date(data_list):
+    # we got all data in list of lists
+    # we should separate all data by date
+    data_by_date = defaultdict(list)
+
+    for data in data_list:
+        data_by_date[data[0]].append(data)
+    
+    return data_by_date
+
+def save_all_to_csv_files_by_date(fout, data_list):
+    data_dict_by_date = defaultdict()
+    data_dict_by_date = separate_data_by_date(data_list)
+
+    for key, value_list in data_dict_by_date.items():
+        output_file = fout[:fout.rfind('.')] + '_' + key[:key.find(':')] + fout[fout.rfind('.'):]
+
+        with open(output_file, 'a') as file:
+            for data in value_list:
+                # When we use CSV we can't use delimeter with several chars
+                # So in this case we use "bare-metal" write
+                out_string = ''
+                for idx, val in enumerate(data):
+                    if idx != 0:
+                        out_string += CSV_DELIMETER
+                    out_string += str(val)
+
+                out_string += CSV_EOL
+
+                file.write(out_string)
+
     with open(fout, 'a') as file:
         for line in data_list:
             # When we use CSV we can't use delimeter with several chars
@@ -148,6 +194,8 @@ def process_all_files_in_folder(in_folder, out_folder, **kwargs):
         print(" >>> Process file '{}' with output name '{}'".format(file_path, out_file_name))
         process_netcdf_file(file_path, out_folder + "/" + out_file_name, **kwargs)
         print("")
+        print(" >>> file '{}' with output name '{}' was processed".format(file_path, out_file_name))
+        print("")
 
 def main():
     params = {
@@ -156,11 +204,12 @@ def main():
         # longitude from -180.0 to 179.25 with step 0.75         
         "longitude": [0.0, 0.75, 1.5],
         # level if exist for this type of the netCDF data. If not exist - please comment it
-        "level": [1,2,100],
+        "level": [1],
         # interested data - please provide name of variable
         "data": "w"
     }
     process_all_files_in_folder("./input", "./output", **params)
+    print('Script is finished')
 
 if __name__ == "__main__":
     main()

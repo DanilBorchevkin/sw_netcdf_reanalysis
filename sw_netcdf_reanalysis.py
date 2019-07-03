@@ -85,7 +85,7 @@ def process_netcdf_file(fin, fout, **kwargs):
                 dsloc = ds.sel(latitude=lat, longitude=lon)
                 time_list = list(map(lambda val: str(val), dsloc['time'].data))
                 data_list = list(map(lambda val: format(val, CSV_FLOAT_FORMAT), dsloc[kwargs['data']].data))
-                resulting_list.append(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude))
+                resulting_list.extend(pack_data_to_list(time_list, data_list, lat=lat, lon=lon-shift_longitude))
     else:
         for lat in lats:
             for lon in lons:
@@ -190,11 +190,11 @@ def main():
         # latitude from 90.0 to -90.0 with step 0.75
         "latitude": [0.0], 
         # longitude from -180.0 to 179.25 with step 0.75         
-        "longitude": [0.0, 0.75, 1.5],
+        "longitude": [0.0],
         # level if exist for this type of the netCDF data. If not exist - please comment it
         "level": [1],
         # interested data - please provide name of variable
-        "data": "w"
+        "data": "sp"
     }
     process_all_files_in_folder("./input", "./output", **params)
     print('Script is finished')
